@@ -1,13 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-形态学操作就是改变物体的形状，如腐蚀使物体"变瘦"，膨胀使物体"变胖"
-先腐蚀后膨胀会分离物体，所以叫开运算，常用来去除小区域物体
-先膨胀后腐蚀会消除物体内的小洞，所以叫闭运算
-img_path = asksaveasfilename(initialdir = file_path,
-                      filetypes=[("jpg格式","jpg"), ("png格式","png"), ("bmp格式","bmp")],
-                      parent = self.root,
-                      title = '保存图片')
-"""
 import tkinter.messagebox as messagebox
 import tkinter as tk
 from tkinter import ttk
@@ -16,7 +6,10 @@ import os
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 import cv2
 import numpy as np
-import time
+
+import tensorflow as tf
+from tensorflow.keras.applications.resnet50 import ResNet50
+from tensorflow.keras.applications.resnet50 import preprocess_input,decode_predictions
 
 file_path = os.path.dirname(__file__)
 WIN_WIDTH = 700
@@ -25,7 +18,7 @@ WIN_HEIGHT = 400
 class Image_sys():
     def __init__(self):
         self.root = tk.Tk()
-        self.root.geometry('700x400+80+80')
+        self.root.geometry('700x600+80+80')
         self.root.title('图像技术实践大作业')  # 设置窗口标题
         # self.root.iconbitmap('icon/icon.ico')  # 设置窗口图标
         # 调用方法会禁止根窗体改变大小
@@ -47,14 +40,6 @@ class Image_sys():
         file_menu.add_command(label="清除所有文件", command=self.clear)
         file_menu.add_command(label="退出程序", command=self.exit_sys)
 
-        # 形态学
-        morph_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="形态学", menu=morph_menu)
-        morph_menu.add_command(label="腐蚀", command=self.mor_corrosion)
-        morph_menu.add_command(label="膨胀", command=self.mor_expand)
-        morph_menu.add_command(label="开运算", command=self.mor_open_operation)
-        morph_menu.add_command(label="闭运算", command=self.mor_close_operation)
-
         # 缩放
         scale_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="缩放", menu=scale_menu)
@@ -62,6 +47,14 @@ class Image_sys():
         scale_menu.add_command(label="缩小PyrDown", command=self.scale_pyrdown)
         scale_menu.add_command(label="放大Resize", command=self.scale_zoom_in)
         scale_menu.add_command(label="缩小Resize", command=self.scale_zoom_out)
+
+        # 形态学
+        morph_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="形态学", menu=morph_menu)
+        morph_menu.add_command(label="腐蚀", command=self.mor_corrosion)
+        morph_menu.add_command(label="膨胀", command=self.mor_expand)
+        morph_menu.add_command(label="开运算", command=self.mor_open_operation)
+        morph_menu.add_command(label="闭运算", command=self.mor_close_operation)
 
         # 滤波
         filter_menu = tk.Menu(menubar, tearoff=0)
@@ -71,6 +64,11 @@ class Image_sys():
         filter_menu.add_command(label="方框", command=self.filter_box)
         filter_menu.add_command(label="高斯", command=self.filter_gauss)
         filter_menu.add_command(label="双边", command=self.filter_bilateral)
+
+        #图像识别
+        identity_menu=tk.Menu(menubar,tearoff=0)
+        menubar.add_cascade(label="图像识别", menu=identity_menu)
+        identity_menu.add_command(label="resnet识别", command=self.identity)
 
         # 帮助
         help_menu = tk.Menu(menubar, tearoff=0)
@@ -99,6 +97,46 @@ class Image_sys():
         self.label_des_image = None
         self.path = ''
         self.frame_scale=None
+        self.root.mainloop()
+
+
+    def identity(self):
+        model = ResNet50(include_top=True, weights='imagenet', input_tensor=None, input_shape=None, pooling=None,classes=1000)
+        if (self.path == ''):
+            return
+        if (self.label_scr_image == None):
+            return
+        image=tf.io.read_file(self.path)
+        image_data = tf.io.decode_jpeg(image)
+        image_data = tf.image.resize(image_data, [224, 224])
+        image_data = tf.expand_dims(image_data, 0)
+        image_data = preprocess_input(image_data)
+        pred = model.predict(image_data)
+        result=decode_predictions(pred)
+        if self.frame_scale is None:
+            self.frame_scale = ttk.Label(self.root)
+            self.frame_scale.place(x=250, y=330)
+        else:
+            for tool in self.frame_scale.winfo_children():
+                tool.destroy()
+            self.frame_scale.destroy()
+            self.frame_scale=ttk.Label(self.root)
+            self.frame_scale.place(x=250,y=330)
+
+        frame_l = ttk.LabelFrame(self.frame_scale,text='种类')
+        frame_r = ttk.LabelFrame(self.frame_scale,text='概率')
+        frame_l.pack(side='left')
+        frame_r.pack(side='right')
+        tk.Label(frame_l, text=result[0][0][1]).pack()
+        tk.Label(frame_l, text=result[0][1][1]).pack()
+        tk.Label(frame_l, text=result[0][2][1]).pack()
+        tk.Label(frame_l, text=result[0][3][1]).pack()
+        tk.Label(frame_l, text=result[0][4][1]).pack()
+        tk.Label(frame_r, text=result[0][0][2]).pack()
+        tk.Label(frame_r, text=result[0][1][2]).pack()
+        tk.Label(frame_r, text=result[0][2][2]).pack()
+        tk.Label(frame_r, text=result[0][3][2]).pack()
+        tk.Label(frame_r, text=result[0][4][2]).pack()
         self.root.mainloop()
 
     def open_file(self):
@@ -221,7 +259,6 @@ class Image_sys():
         # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # 矩形结构
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))  # 椭圆结构
         # kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (5, 5))  # 十字形结构
-
         if self.frame_scale is None:
             self.frame_scale = ttk.Label(self.root)
             self.frame_scale.place(x=190, y=330)
